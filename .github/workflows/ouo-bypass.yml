@@ -1,14 +1,11 @@
-name: OUO Bypasser
+name: OUO Bypasser (Manual Only)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ "main" ]
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    # timeout-minutes: 60
 
     steps:
       - name: Checkout repo
