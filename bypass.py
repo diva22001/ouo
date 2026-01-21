@@ -11,16 +11,15 @@ from urllib.parse import urlparse
 # ==========================================
 # KONFIGURASI
 # ==========================================
-CONCURRENT_THREADS = 5  # Sesuaikan dengan CPU GitHub Runner (biasanya 2-core)
-TIMEOUT_PER_LINK = 30000 # 30 detik
+CONCURRENT_THREADS = 5  # Thread browser bersamaan
+TIMEOUT_PER_LINK = 30000 # 30 detik timeout
 
 class OuoBypasser:
     def __init__(self):
         self.results = []
+        # Update Source Proxy sesuai permintaan
         self.proxy_sources = [
-            "https://raw.githubusercontent.com/monosans/proxy-list/refs/heads/main/proxies/all.txt",
-            "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
-            "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt"
+            "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/countries/US/data.txt"
         ]
 
     async def fetch_all_proxies(self):
@@ -34,24 +33,27 @@ class OuoBypasser:
                 all_proxies.update(proxy_list)
 
         proxy_list = list(all_proxies)
-        random.shuffle(proxy_list)
+        random.shuffle(proxy_list) # Acak urutan
         print(f"✅ Total proxy mentah didapatkan: {len(proxy_list)}")
         return proxy_list
 
     async def _fetch_single_source(self, session, url):
         try:
-            async with session.get(url, timeout=10) as response:
+            async with session.get(url, timeout=15) as response:
                 if response.status == 200:
                     content = await response.text()
+                    # Filter baris kosong dan pastikan ada format port (:)
                     return [line.strip() for line in content.split('\n') if line.strip() and ':' in line]
-        except:
-            pass
+        except Exception as e:
+            print(f"⚠️ Gagal mengambil dari source: {e}")
         return []
 
     def normalize_proxy_url(self, proxy):
         proxy = proxy.strip()
+        # Jika sudah ada protocol, biarkan
         if proxy.startswith(('http://', 'https://', 'socks4://', 'socks5://')):
             return proxy
+        # Jika format IP:PORT, anggap HTTP
         if re.match(r'^\d+\.\d+\.\d+\.\d+:\d+$', proxy):
             return f"http://{proxy}"
         return None
@@ -79,7 +81,7 @@ class OuoBypasser:
             'timestamp': datetime.now().isoformat()
         }
 
-        print(f"   [W{worker_id}] 🚀 Start: {proxy[:25]}...")
+        print(f"   [W{worker_id}] 🚀 Start: {proxy[:30]}...")
 
         async with async_playwright() as p:
             browser = None
@@ -95,20 +97,24 @@ class OuoBypasser:
                     ignore_https_errors=True
                 )
                 
+                # Anti-bot detection simple
                 await context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                
                 page = await context.new_page()
                 page.set_default_timeout(TIMEOUT_PER_LINK)
 
+                # Validasi koneksi ke URL target
                 try:
                     await page.goto(url, wait_until='domcontentloaded')
                 except Exception:
+                    # Proxy mati atau timeout
                     print(f"   [W{worker_id}] ❌ Proxy Dead/Timeout")
                     await browser.close()
                     return result
 
-                # Logika Bypass
+                # Logika Bypass OUO
                 try:
-                    # Klik I am Human
+                    # Klik "I am Human"
                     try:
                         await page.click('#btn-main', timeout=5000)
                     except:
@@ -118,9 +124,9 @@ class OuoBypasser:
                                 await btn.click()
                                 break
                     
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(3) # Tunggu loading
 
-                    # Klik Get Link
+                    # Klik "Get Link"
                     try:
                         await page.click('#btn-main', timeout=5000)
                     except:
@@ -132,6 +138,7 @@ class OuoBypasser:
                     await page.wait_for_load_state('networkidle', timeout=10000)
                     
                     curr_url = page.url
+                    # Cek keberhasilan (bukan ouo.io, bukan ouo.press, bukan error chrome)
                     if 'ouo.io' not in curr_url and 'ouo.press' not in curr_url and not curr_url.startswith('chrome-error'):
                         result['success'] = True
                         result['final_url'] = curr_url
@@ -181,32 +188,43 @@ async def worker(id, bypasser, proxy_queue, link_list, stats):
         
         proxy_queue.task_done()
         
+        # Log stats sederhana
         if stats['processed'] % 10 == 0:
             print(f"\n📊 TOTAL: {stats['success']}/{stats['processed']} Sukses | Sisa Proxy: {proxy_queue.qsize()}\n")
 
 async def main():
-    print("="*60 + "\n🚀 OUO BYPASSER (GITHUB ACTIONS VERSION)\n" + "="*60)
+    print("="*60 + "\n🚀 OUO BYPASSER (US PROXY - UNLIMITED)\n" + "="*60)
 
     bypasser = OuoBypasser()
+    
+    # Load Links
     links = bypasser.load_links()
-    if not links: return
+    if not links: 
+        print("Link kosong/file tidak ada.")
+        return
 
+    # Load Proxies
     raw_proxies = await bypasser.fetch_all_proxies()
-    if not raw_proxies: return
+    if not raw_proxies: 
+        print("Proxy kosong.")
+        return
 
     proxy_queue = asyncio.Queue()
-    # Batasi jumlah proxy agar tidak timeout di GitHub Actions (Maks 6 jam)
-    # Kita ambil 500 proxy acak saja untuk satu kali run
-    for p in raw_proxies[:500]: 
+    
+    # ⚠️ PERUBAHAN: Memasukkan SEMUA proxy tanpa batasan slice
+    print(f"🔥 Memasukkan {len(raw_proxies)} proxy ke antrian...")
+    for p in raw_proxies: 
         proxy_queue.put_nowait(p)
 
     stats = {'processed': 0, 'success': 0}
     
     tasks = []
+    print(f"🎬 Menjalankan {CONCURRENT_THREADS} workers...")
     for i in range(CONCURRENT_THREADS):
         task = asyncio.create_task(worker(i+1, bypasser, proxy_queue, links, stats))
         tasks.append(task)
 
+    # Tunggu sampai antrian kosong
     await proxy_queue.join()
     
     for task in tasks: task.cancel()
