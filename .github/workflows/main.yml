@@ -3,9 +3,8 @@
 name: Run Ouo Bypasser
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
 
 jobs:
   build:
