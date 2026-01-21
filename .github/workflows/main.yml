@@ -3,9 +3,8 @@
 name: Run Ouo Bypasser
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
-
+  workflow_dispatch:
+  
 jobs:
   build:
     runs-on: ubuntu-latest
