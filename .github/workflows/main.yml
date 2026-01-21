@@ -26,8 +26,14 @@ jobs:
 
     - name: Install Playwright Browsers
       run: |
-        playwright install chromium
-        playwright install-deps chromium
+        # Fix dependensi libasound2 yang hilang di Ubuntu terbaru
+        sudo apt-get update
+        sudo apt-get install -y libasound2t64
+        
+        # Install Playwright dan dependensi lainnya
+        python -m playwright install chromium
+        # Gunakan --with-deps untuk menginstal sisa library sistem
+        python -m playwright install-deps chromium
 
     - name: Run Bypasser
       run: python bypass.py
