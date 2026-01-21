@@ -30,7 +30,7 @@ class OuoBypasser:
         self.results = []
         # Sumber proxy public
         self.proxy_sources = [
-            "https://raw.githubusercontent.com/monosans/proxy-list/refs/heads/main/proxies/all.txt"
+            "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/countries/US/data.txt"
             # "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt",
             # "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
             # "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
